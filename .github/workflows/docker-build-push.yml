@@ -50,7 +50,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: nodejs-helloworld
-          file: ./Dockerfile
+          file: ./nodejs-helloworld/Dockerfile
           platforms: linux/amd64,linux/arm64
           # Only push on non-PR events; PRs just build to validate the Dockerfile.
           push: ${{ github.event_name != 'pull_request' }}
