@@ -6,19 +6,20 @@ WORKDIR /app
 # ---- Dependencies stage ----
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+# Uses npm ci when a lockfile is present (fast, reproducible), otherwise
+# falls back to npm install (and will generate a lockfile on the fly).
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 # ---- Build stage (installs devDependencies, runs build if present) ----
 FROM base AS build
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY . .
 RUN npm run build --if-present
 
 # ---- Production image ----
 FROM base AS runner
 ENV NODE_ENV=production
-ENV PORT=3000
 
 # Run as non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
@@ -28,10 +29,10 @@ COPY --from=build /app ./
 
 USER nodejs
 
-EXPOSE 3000
+EXPOSE 8080
 
-# Basic healthcheck (adjust path/port to match your app)
+# app.js hardcodes port 8080 and serves '/' with "Hello World!"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:8080/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
-CMD ["node", "index.js"]
+CMD ["node", "app.js"]
